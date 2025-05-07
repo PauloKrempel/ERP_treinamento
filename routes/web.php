@@ -5,7 +5,7 @@ use App\Http\Controllers\CostCenterController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\FinancialReportController; // Assuming a new controller for local reports
+use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\IntegrationSettingController;
 
 /*
@@ -40,6 +40,7 @@ Route::get('/financial-reports', [FinancialReportController::class, 'index'])->n
 Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markAsPaid'])->name('financial_reports.markAsPaid'); // Re-using markAsPaid from ReportController for now, might move to FinancialReportController
 Route::get('/financial-reports/create', [FinancialReportController::class, 'create'])->name('financial_reports.create');
 Route::post('/financial-reports', [FinancialReportController::class, 'store'])->name('financial_reports.store');
+Route::get('/financial-reports/{financialReport}/expenses', [FinancialReportController::class, 'getExpenses'])->name('financial_reports.expenses'); // Rota para buscar despesas
 
 // Integration Settings
 Route::resource('integration-settings', IntegrationSettingController::class)->only(['index', 'edit', 'update']);
@@ -49,4 +50,5 @@ Route::resource('integration-settings', IntegrationSettingController::class)->on
 // For now, we'll focus on the core CRUDs without authentication for simplicity.
 
 // require __DIR__.'/auth.php'; // Commented out as auth.php does not exist and is not needed for now
+
 

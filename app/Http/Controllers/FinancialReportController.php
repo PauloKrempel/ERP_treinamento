@@ -172,18 +172,15 @@ class FinancialReportController extends Controller
     /**
      * Busca e retorna as despesas de um relatório financeiro específico.
      *
-     * @param  int  $reportId
+     * @param  App\Models\FinancialReport  $financialReport  (Injetado pela rota)
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getReportExpenses($reportId)
+    public function getExpenses(FinancialReport $financialReport) // Nome do método e parâmetro ajustados
     {
-        $report = FinancialReport::with("expenses")->find($reportId);
+        // Carrega as despesas relacionadas, se já não estiverem carregadas
+        $financialReport->loadMissing('expenses');
 
-        if (!$report) {
-            return response()->json(["error" => "Relatório não encontrado."], 404);
-        }
-
-        $formattedExpenses = $report->expenses->map(function ($expense) {
+        $formattedExpenses = $financialReport->expenses->map(function ($expense) {
             return [
                 "title" => $expense->title,
                 "date" => Carbon::parse($expense->date)->format("d/m/Y"), // Formata a data
@@ -195,26 +192,8 @@ class FinancialReportController extends Controller
 
         return response()->json($formattedExpenses);
     }
-    public function markAsPaid(FinancialReport $report) // Laravel injetará o FinancialReport com base no ID da rota
-    {
-        if ($report->status === "Pago") {
-            return redirect()->route("financial_reports.index")->with("warning", "Relatório #{$report->id} já estava marcado como pago.");
-        }
 
-        $report->status = "Pago";
-        $report->payment_date = Carbon::now(); // Define a data de pagamento como agora
-
-        // Atualiza o total pago pelo usuário, se houver um usuário associado
-        if ($report->user_id && $report->amount > 0) {
-            $user = User::find($report->user_id);
-            if ($user) {
-                $user->total_paid_amount = ($user->total_paid_amount ?? 0) + $report->amount;
-                $user->save();
-            }
-        }
-
-        $report->save();
-
-        return redirect()->route("financial_reports.index")->with("success", "Relatório #{$report->id} marcado como pago com sucesso!");
-    }
+    // O método markAsPaid foi movido para o ReportController conforme a definição da rota
+    // Se precisar dele aqui para relatórios manuais SEM interação com VExpenses, precisaria de uma rota diferente.
 }
+

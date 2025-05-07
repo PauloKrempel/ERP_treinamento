@@ -56,9 +56,77 @@
             </div>
         </div>
 
+        <div class="card mb-3">
+            <div class="card-header">
+                Filtro de Período para Importação de Relatórios VExpenses
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="VEXPENSES_IMPORT_PERIOD_TYPE" class="form-label">Período de Importação</label>
+                    <select class="form-select @error("VEXPENSES_IMPORT_PERIOD_TYPE") is-invalid @enderror" id="VEXPENSES_IMPORT_PERIOD_TYPE" name="VEXPENSES_IMPORT_PERIOD_TYPE">
+                        <option value="all_time" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "all_time" ? "selected" : "" }}>Todo o período</option>
+                        <option value="last_24_hours" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "last_24_hours" ? "selected" : "" }}>Últimas 24 horas</option>
+                        <option value="last_7_days" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "last_7_days" ? "selected" : "" }}>Últimos 7 dias</option>
+                        <option value="last_15_days" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "last_15_days" ? "selected" : "" }}>Últimos 15 dias</option>
+                        <option value="last_30_days" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "last_30_days" ? "selected" : "" }}>Últimos 30 dias</option>
+                        <option value="custom" {{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "custom" ? "selected" : "" }}>Personalizado</option>
+                    </select>
+                    @error("VEXPENSES_IMPORT_PERIOD_TYPE")
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text">Selecione o período para buscar os relatórios do VExpenses. "Todo o período" não aplicará filtro de data.</div>
+                </div>
+
+                <div id="custom_date_range_fields" style="{{ old("VEXPENSES_IMPORT_PERIOD_TYPE", $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time") == "custom" ? "" : "display: none;" }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="VEXPENSES_IMPORT_CUSTOM_START_DATE" class="form-label">Data de Início (Personalizado)</label>
+                            <input type="date" class="form-control @error("VEXPENSES_IMPORT_CUSTOM_START_DATE") is-invalid @enderror" 
+                                   id="VEXPENSES_IMPORT_CUSTOM_START_DATE" name="VEXPENSES_IMPORT_CUSTOM_START_DATE" 
+                                   value="{{ old("VEXPENSES_IMPORT_CUSTOM_START_DATE", $settings["VEXPENSES_IMPORT_CUSTOM_START_DATE"]->value ?? "") }}">
+                            @error("VEXPENSES_IMPORT_CUSTOM_START_DATE")
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="VEXPENSES_IMPORT_CUSTOM_END_DATE" class="form-label">Data Final (Personalizado)</label>
+                            <input type="date" class="form-control @error("VEXPENSES_IMPORT_CUSTOM_END_DATE") is-invalid @enderror" 
+                                   id="VEXPENSES_IMPORT_CUSTOM_END_DATE" name="VEXPENSES_IMPORT_CUSTOM_END_DATE" 
+                                   value="{{ old("VEXPENSES_IMPORT_CUSTOM_END_DATE", $settings["VEXPENSES_IMPORT_CUSTOM_END_DATE"]->value ?? "") }}">
+                            @error("VEXPENSES_IMPORT_CUSTOM_END_DATE")
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="form-text">Se "Personalizado" for selecionado, defina as datas de início e fim para a importação.</div>
+                </div>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Salvar Configurações</button>
         <a href="{{ route("integration-settings.index") }}" class="btn btn-secondary">Cancelar</a>
     </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const periodTypeSelect = document.getElementById("VEXPENSES_IMPORT_PERIOD_TYPE");
+    const customDateFieldsDiv = document.getElementById("custom_date_range_fields");
+
+    function toggleCustomDateFields() {
+        if (periodTypeSelect.value === "custom") {
+            customDateFieldsDiv.style.display = "block";
+        } else {
+            customDateFieldsDiv.style.display = "none";
+        }
+    }
+
+    // Initial check
+    toggleCustomDateFields();
+
+    // Add event listener
+    periodTypeSelect.addEventListener("change", toggleCustomDateFields);
+});
+</script>
 @endsection
 

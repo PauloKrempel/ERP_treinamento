@@ -119,7 +119,8 @@
         </div>
         @if($financialReports->hasPages())
             <div class="card-footer py-2">
-                {{ $financialReports->links() }}
+                {{-- Alterado para usar o template de paginação customizado --}}
+                {{ $financialReports->links("vendor.pagination.custom-pagination") }}
             </div>
         @endif
     </div>
@@ -240,5 +241,6 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 @endsection
+
 
 

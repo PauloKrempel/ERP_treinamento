@@ -34,7 +34,8 @@
                             </tr>
                             <tr>
                                 <th>Total Pago ao Usuário</th>
-                                <td><strong>R$ {{ number_format($user->total_paid_amount ?? 0, 2, ",", ".") }}</strong></td>
+                                {{-- Alterado para usar a variável $totalPaidAmount passada pelo controller --}}
+                                <td><strong>R$ {{ number_format($totalPaidAmount ?? 0, 2, ",", ".") }}</strong></td>
                             </tr>
                             <tr>
                                 <th>Membro Desde</th>
@@ -46,7 +47,8 @@
                     <hr>
 
                     <h4>Relatórios Pagos para {{ $user->name }}</h4>
-                    @if($paidReports->count() > 0)
+                    {{-- Alterado para usar a variável $paginatedPaidReports --}}
+                    @if($paginatedPaidReports->count() > 0)
                         <div class="table-responsive">
                             <table class="table table-striped table-hover table-sm">
                                 <thead>
@@ -60,7 +62,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($paidReports as $report)
+                                    @foreach($paginatedPaidReports as $report)
                                         <tr>
                                             <td>{{ $report->id }}</td>
                                             <td>{{ Str::limit($report->description, 50) }}</td>
@@ -76,9 +78,9 @@
                                 </tbody>
                             </table>
                         </div>
-                        @if($paidReports->hasPages())
+                        @if($paginatedPaidReports->hasPages())
                             <div class="mt-3">
-                                {{ $paidReports->links() }}
+                                {{ $paginatedPaidReports->links() }}
                             </div>
                         @endif
                     @else

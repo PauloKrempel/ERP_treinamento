@@ -38,21 +38,23 @@ class VExpensesService
             }
         }
 
-        // 1. Configura o cliente HTTP base
         $httpClient = Http::withHeaders([
-            "Authorization" => $this->apiToken, // CORRETO: Sem "Bearer "
+            "Authorization" => $this->apiToken,
             "Accept" => "application/json",
             "Content-Type" => "application/json",
         ]);
 
-        // 2. Adiciona a opção para desabilitar a verificação SSL em ambiente local
-        if (app()->isLocal()) { // Verifica se o ambiente é local
+        if (app()->isLocal()) {
             $httpClient = $httpClient->withoutVerifying();
         }
 
-        // 3. Executa a requisição USANDO o $httpClient configurado
-        $response = $httpClient->{$method}($url, $method === "get" ? $processedQueryParams : $data);
-
+        // Modificado para usar $data para métodos não-GET e $processedQueryParams para GET
+        $response = null;
+        if (strtolower($method) === "get") {
+            $response = $httpClient->{$method}($url, $processedQueryParams);
+        } else {
+            $response = $httpClient->{$method}($url, $data);
+        }
 
         if ($response->failed()) {
             Log::error("Falha na Requisição API VExpenses", [
@@ -60,47 +62,51 @@ class VExpensesService
                 "method" => $method,
                 "status" => $response->status(),
                 "response" => $response->body(),
-                "data_sent" => $data,
-                "query_params" => $processedQueryParams,
+                "data_sent" => $data, // Loga os dados enviados para métodos não-GET
+                "query_params" => $processedQueryParams, // Loga os query params para GET
             ]);
-            return null;
+            // Retornar um array com informações do erro para melhor tratamento no controller
+            return [
+                "success" => false,
+                "status" => $response->status(),
+                "message" => $response->json("message", "Erro desconhecido na API VExpenses."),
+                "errors" => $response->json("data.errors", $response->json("errors", [])),
+                "response_body" => $response->body()
+            ];
         }
-
-        return $response->json();
+        
+        $jsonResponse = $response->json();
+        // Adicionar 'success' => true para respostas bem-sucedidas para consistência
+        if (is_array($jsonResponse)) {
+            $jsonResponse['success'] = true;
+        } else {
+            // Se a resposta não for um array (ex: string vazia em sucesso 204), crie um array
+            $jsonResponse = ['success' => true, 'data' => $jsonResponse];
+        }
+        return $jsonResponse;
     }
 
 
-    /**
-     * Get reports from VExpenses API.
-     *
-     * @param array $filters (e.g., ["status_string" => "Aprovado", "start_date" => "2023-01-01", "end_date" => "2023-01-31"])
-     * @param array|string|null $includes (e.g., ["users", "expenses"] or "users,expenses")
-     * @return array|null
-     */
     public function getReports(array $filters = [], $includes = null)
     {
         $queryParams = [];
-        $endpoint = "reports"; // Default endpoint
+        $endpoint = "reports";
 
-        // Handle status filter: if status_string is provided, use the specific endpoint
         if (isset($filters["status_string"]) && !empty($filters["status_string"])) {
             $statusString = $filters["status_string"];
-            $endpoint = "reports/status/" . rawurlencode($statusString); // Use the specific endpoint for status string
-            unset($filters["status_string"]); // Remove from queryParams as it's in the path
+            $endpoint = "reports/status/" . rawurlencode($statusString);
+            unset($filters["status_string"]);
         } elseif (isset($filters["status_id"])) {
-            // Fallback or alternative: if status_id is used, add to queryParams for the general /reports endpoint
             $queryParams["status_id"] = $filters["status_id"];
             unset($filters["status_id"]);
         }
 
-        // Add other filters (like dates) to queryParams
         foreach ($filters as $key => $value) {
             if (!empty($value)) {
                 $queryParams[$key] = $value;
             }
         }
 
-        // Handle includes
         if (!empty($includes)) {
             $queryParams["include"] = is_array($includes) ? implode(",", $includes) : $includes;
         }
@@ -108,17 +114,16 @@ class VExpensesService
         return $this->makeRequest("get", $endpoint, [], $queryParams);
     }
 
-    public function markReportAsPaid(string $reportId)
+    // Modificado para aceitar $data como segundo parâmetro
+    public function markReportAsPaid(string $reportId, array $data = [])
     {
         $endpoint = "reports/{$reportId}/pay";
-        return $this->makeRequest("put", $endpoint, []);
+        // Passa $data para makeRequest, que será usado no corpo da requisição PUT
+        return $this->makeRequest("put", $endpoint, $data);
     }
 
-    public function updateReportStatus(string $reportId, int $statusId) // This might need to change if status is always string
+    public function updateReportStatus(string $reportId, int $statusId)
     {
-        // This method might be less used if we primarily filter by status string
-        // and pay reports. If direct status updates with numeric IDs are still needed,
-        // it can remain. Otherwise, it might need adaptation or removal.
         $endpoint = "reports/{$reportId}/status";
         $data = ["status_id" => $statusId];
         return $this->makeRequest("put", $endpoint, $data);
@@ -139,3 +144,4 @@ class VExpensesService
         return $this->makeRequest("post", "members", $memberData);
     }
 }
+

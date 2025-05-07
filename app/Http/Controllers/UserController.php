@@ -59,9 +59,25 @@ class UserController extends Controller
         $paidReports = FinancialReport::where('user_id', $user->id)
                                       ->where('status', 'Pago')
                                       ->orderBy('payment_date', 'desc') // Ordenar por data de pagamento, mais recentes primeiro
-                                      ->paginate(10); // Paginar se houver muitos relatórios
+                                      ->get(); // Usar get() para pegar todos para somar, depois paginar se necessário para exibição
 
-        return view("users.show", compact("user", "paidReports"))
+        // Calcular o total pago
+        $totalPaidAmount = $paidReports->sum('amount');
+
+        // Paginar os relatórios para exibição na tabela, se necessário
+        // Se você já usou get() acima, pode paginar a coleção assim:
+        $perPage = 10;
+        $currentPage = request()->input('page', 1);
+        $currentPageItems = $paidReports->slice(($currentPage - 1) * $perPage, $perPage)->all();
+        $paginatedPaidReports = new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentPageItems, 
+            count($paidReports), 
+            $perPage, 
+            $currentPage, 
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        return view("users.show", compact("user", "paginatedPaidReports", "totalPaidAmount"))
             ->with("pageTitle", "Detalhes do Usuário: " . $user->name);
     }
 

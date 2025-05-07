@@ -38,11 +38,10 @@
             margin-right: 15px;
         }
 
-        .pagination svg {
-            width: 1em;
-            /* Ou um valor em pixels, ex: 16px */
-            height: 1em;
-            /* Ou um valor em pixels, ex: 16px */
+        /* Ajuste para os ícones da paginação */
+        .pagination .page-link svg {
+            width: 16px !important; /* Define um tamanho fixo em pixels */
+            height: 16px !important; /* Define um tamanho fixo em pixels */
         }
     </style>
 </head>
