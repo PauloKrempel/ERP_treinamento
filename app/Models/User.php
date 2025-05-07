@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'vexpenses_id', // <--- ADICIONE ESTA LINHA
     ];
 
     /**
