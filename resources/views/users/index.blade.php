@@ -31,7 +31,7 @@
             @forelse ($users as $user)
                 <tr>
                     <td>{{ $user->id }}</td>
-                    <td>{{ $user->name }}</td>
+                    <td><a href="{{ route('users.show', $user->id) }}">{{ $user->name }}</a></td>
                     <td>{{ $user->email }}</td>
                     <td>{{ $user->vexpenses_id ?? 'N/A' }}</td>
                     <td>
@@ -40,7 +40,7 @@
                             <a class="btn btn-primary btn-sm" href="{{ route("users.edit", $user->id) }}">Editar</a>
                             @csrf
                             @method("DELETE")
-                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm("Tem certeza que deseja excluir este usuário?")">Excluir</button>
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja excluir este usuário?')">Excluir</button>
                         </form>
                     </td>
                 </tr>
@@ -51,6 +51,7 @@
             @endforelse
         </tbody>
     </table>
+
     {!! $users->links() !!}
 </div>
 @endsection

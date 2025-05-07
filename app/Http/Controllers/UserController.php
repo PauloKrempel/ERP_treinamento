@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\FinancialReport; // Adicionar para buscar os relatórios
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -54,8 +55,14 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        return view("users.show", compact("user"))
-            ->with("pageTitle", "Detalhes do Usuário");
+        // Carregar os relatórios financeiros pagos para este usuário
+        $paidReports = FinancialReport::where('user_id', $user->id)
+                                      ->where('status', 'Pago')
+                                      ->orderBy('payment_date', 'desc') // Ordenar por data de pagamento, mais recentes primeiro
+                                      ->paginate(10); // Paginar se houver muitos relatórios
+
+        return view("users.show", compact("user", "paidReports"))
+            ->with("pageTitle", "Detalhes do Usuário: " . $user->name);
     }
 
     /**
@@ -96,7 +103,6 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
-
         return redirect()->route("users.index")
             ->with("success", "Usuário excluído com sucesso.");
     }

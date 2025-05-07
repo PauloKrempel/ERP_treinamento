@@ -6,6 +6,8 @@ use App\Models\FinancialReport;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Models\FinancialReportExpense;
+use Carbon\Carbon; // Adicionado para formatação de data
 
 class FinancialReportController extends Controller
 {
@@ -39,6 +41,7 @@ class FinancialReportController extends Controller
             "Pago" => "Pago",
             "Rejeitado" => "Rejeitado",
         ];
+
         $originOptions = [
             "VExpenses" => "VExpenses",
             "Manual" => "Manual",
@@ -80,7 +83,7 @@ class FinancialReportController extends Controller
                 "description" => $validatedData["description"],
                 "amount" => $validatedData["amount"],
                 "report_date" => $validatedData["report_date"],
-                "status" => $validatedData["status"], 
+                "status" => $validatedData["status"],
                 "origin" => "Manual",
                 "payment_date" => null,
                 "notes" => $validatedData["notes"],
@@ -88,7 +91,6 @@ class FinancialReportController extends Controller
 
             return redirect()->route("financial_reports.index")
                 ->with("success", "Relatório financeiro manual adicionado com sucesso.");
-
         } catch (\Exception $e) {
             Log::error("Error creating manual financial report: " . $e->getMessage(), ["exception" => $e]);
             return redirect()->back()
@@ -137,13 +139,12 @@ class FinancialReportController extends Controller
                 "description" => $validatedData["description"],
                 "amount" => $validatedData["amount"],
                 "report_date" => $validatedData["report_date"],
-                "status" => $validatedData["status"], 
+                "status" => $validatedData["status"],
                 "notes" => $validatedData["notes"],
             ]);
 
             return redirect()->route("financial_reports.index")
                 ->with("success", "Relatório financeiro atualizado com sucesso.");
-
         } catch (\Exception $e) {
             Log::error("Error updating financial report: " . $e->getMessage(), ["exception" => $e]);
             return redirect()->back()
@@ -167,5 +168,53 @@ class FinancialReportController extends Controller
                 ->with("error", "Erro ao excluir relatório financeiro: " . $e->getMessage());
         }
     }
-}
 
+    /**
+     * Busca e retorna as despesas de um relatório financeiro específico.
+     *
+     * @param  int  $reportId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getReportExpenses($reportId)
+    {
+        $report = FinancialReport::with("expenses")->find($reportId);
+
+        if (!$report) {
+            return response()->json(["error" => "Relatório não encontrado."], 404);
+        }
+
+        $formattedExpenses = $report->expenses->map(function ($expense) {
+            return [
+                "title" => $expense->title,
+                "date" => Carbon::parse($expense->date)->format("d/m/Y"), // Formata a data
+                "value" => number_format($expense->value, 2, ",", "."), // Formata o valor para BRL
+                "receipt_url" => $expense->receipt_url,
+                "observation" => $expense->observation,
+            ];
+        });
+
+        return response()->json($formattedExpenses);
+    }
+    public function markAsPaid(FinancialReport $report) // Laravel injetará o FinancialReport com base no ID da rota
+    {
+        if ($report->status === "Pago") {
+            return redirect()->route("financial_reports.index")->with("warning", "Relatório #{$report->id} já estava marcado como pago.");
+        }
+
+        $report->status = "Pago";
+        $report->payment_date = Carbon::now(); // Define a data de pagamento como agora
+
+        // Atualiza o total pago pelo usuário, se houver um usuário associado
+        if ($report->user_id && $report->amount > 0) {
+            $user = User::find($report->user_id);
+            if ($user) {
+                $user->total_paid_amount = ($user->total_paid_amount ?? 0) + $report->amount;
+                $user->save();
+            }
+        }
+
+        $report->save();
+
+        return redirect()->route("financial_reports.index")->with("success", "Relatório #{$report->id} marcado como pago com sucesso!");
+    }
+}
