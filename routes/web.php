@@ -37,7 +37,8 @@ Route::post('/vexpenses-reports/import', [ReportController::class, 'importFromVE
 // New "Contas a Pagar" (Financial Reports) section
 // This will list reports from our local financial_reports table
 Route::get('/financial-reports', [FinancialReportController::class, 'index'])->name('financial_reports.index');
-Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markAsPaid'])->name('financial_reports.markAsPaid'); // Re-using markAsPaid from ReportController for now, might move to FinancialReportController
+//Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markAsPaid'])->name('financial_reports.markAsPaid'); // Re-using markAsPaid from ReportController for now, might move to FinancialReportController
+Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markReportAsPaid'])->name('financial_reports.markAsPaid');
 Route::get('/financial-reports/create', [FinancialReportController::class, 'create'])->name('financial_reports.create');
 Route::post('/financial-reports', [FinancialReportController::class, 'store'])->name('financial_reports.store');
 Route::get('/financial-reports/{financialReport}/expenses', [ReportController::class, 'getExpensesData'])->name('financial_reports.expenses.data');

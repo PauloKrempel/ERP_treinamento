@@ -309,9 +309,18 @@ class ReportController extends Controller
                 if (!$reportIdFromApi) {
                     Log::warning("Relatório da API VExpenses sem ID durante atualização. Pulando.", ["report_data" => $vexpensesReportData]);
                     $skippedForMissingDataCount++;
-                    $skippedReportsDetails[] = "ID: não fornecido, Descrição: " . ($vexpensesReport["description"] ?? 'N/A');
+                    $skippedReportsDetails[] = $vexpensesReportData;
                     continue;
                 }
+
+                $reportDateFromApi = $vexpensesReport["approval_date"] ?? ($vexpensesReport["created_at"] ?? null);
+                if (empty($reportDateFromApi)) {
+                    Log::warning("Relatório da API VExpenses ID {$reportIdFromApi} sem 'approval_date' ou 'created_at' durante atualização. Pulando.", ["report_data" => $vexpensesReportData]);
+                    $skippedForMissingDataCount++;
+                    $skippedReportsDetails[] = $vexpensesReportData;
+                    continue;
+                }
+                $reportDateFromApi = Carbon::parse($reportDateFromApi)->toDateString();
 
                 $existingReport = FinancialReport::where("vexpenses_report_id", $reportIdFromApi)->first();
 
@@ -320,16 +329,7 @@ class ReportController extends Controller
                     continue;
                 }
 
-                // **AJUSTE: Usar 'approval_date' e verificar sua existência para data do relatório**
-                $reportDateFromApi = $vexpensesReport["approval_date"] ?? ($vexpensesReport["created_at"] ?? null);
-                if (empty($reportDateFromApi)) {
-                    Log::warning("Relatório da API VExpenses ID {$reportIdFromApi} para atualização sem 'approval_date' ou 'created_at'. Pulando atualização de data.", ["report_data" => $vexpensesReportData]);
-                    $reportDateFromApi = $existingReport->report_date; // Mantém a data existente se a nova não for válida
-                } else {
-                    $reportDateFromApi = Carbon::parse($reportDateFromApi)->toDateString();
-                }
-
-                $localUser = $existingReport->user; // Manter usuário original se não houver nova info
+                $localUser = $existingReport->user; 
                 $vexpensesUserIntegrationIdFromApi = $existingReport->vexpenses_user_integration_id;
                 $userField = $vexpensesReport["user"] ?? null;
                 if ($userField) {
@@ -468,11 +468,22 @@ class ReportController extends Controller
     public function markReportAsPaid(Request $request, FinancialReport $financialReport)
     {
         try {
+            $payload = [];
+            $simulateErrorSetting = IntegrationSetting::where('key', 'VEXPENSES_SIMULATE_PAYMENT_DATE_ERROR')->first();
+            $simulateError = $simulateErrorSetting && ($simulateErrorSetting->value === 'true' || $simulateErrorSetting->value === true || $simulateErrorSetting->value === 1);
+
+            if (!$simulateError) {
+                $currentDateTime = Carbon::now()->format('Y-m-d H:i:s');
+                $payload['payment_date'] = $currentDateTime;
+            }
+
             if ($financialReport->origin === "VExpenses" && $financialReport->vexpenses_report_id) {
-                $apiResponse = $this->vexpensesService->markReportAsPaid($financialReport->vexpenses_report_id);
+                $apiResponse = $this->vexpensesService->markReportAsPaid($financialReport->vexpenses_report_id, $payload);
                 Log::info("Tentativa de marcar relatório como pago no VExpenses", [
                     "report_id" => $financialReport->id,
                     "vexpenses_report_id" => $financialReport->vexpenses_report_id,
+                    "payload_sent" => $payload, // Log do payload enviado
+                    "simulate_error_setting" => $simulateError,
                     "api_response" => $apiResponse
                 ]);
 
@@ -482,9 +493,8 @@ class ReportController extends Controller
                         $errorMessage .= " Detalhe da API: " . $apiResponse["message"];
                     }
                     
-                    // Mesmo com falha na API, marcar como pago localmente, mas com aviso
                     $financialReport->status = "Pago";
-                    $financialReport->payment_date = Carbon::now()->toDateString();
+                    $financialReport->payment_date = Carbon::now()->toDateString(); 
                     $financialReport->save();
 
                     return redirect()->route("financial_reports.index")
@@ -496,7 +506,7 @@ class ReportController extends Controller
             }
 
             $financialReport->status = "Pago";
-            $financialReport->payment_date = Carbon::now()->toDateString();
+            $financialReport->payment_date = Carbon::now()->toDateString(); 
             $financialReport->save();
 
             return redirect()->route("financial_reports.index")->with("success_detailed", [
