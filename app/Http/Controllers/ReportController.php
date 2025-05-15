@@ -26,7 +26,7 @@ class ReportController extends Controller
         if ($request->filled("status_string")) {
             $filters["status_string"] = $request->input("status_string");
         }
-        
+
         if ($request->filled("start_date") && $request->filled("end_date")) {
             $filters["search"] = "approval_date:{$request->input("start_date")},{$request->input("end_date")}";
             $filters["searchFields"] = "approval_date:between";
@@ -34,12 +34,14 @@ class ReportController extends Controller
             $filters["search"] = "approval_date:{$request->input("start_date")}";
             $filters["searchFields"] = "approval_date:>="; // Assuming >= for a single start date
         }
+
         if (isset($filters["searchFields"])){
             $filters["searchJoin"] = "and";
         }
 
         $defaultIncludesSetting = IntegrationSetting::where("key", "VEXPENSES_API_INCLUDES")->first();
-        $includes = $defaultIncludesSetting ? explode(",", $defaultIncludesSetting->value) : ["users", "expenses"]; 
+        $includes = $defaultIncludesSetting ? explode(",", $defaultIncludesSetting->value) : ["users", "expenses"];
+
         if (!in_array("expenses", $includes)) {
             $includes[] = "expenses";
         }
@@ -48,7 +50,6 @@ class ReportController extends Controller
         }
 
         $reportsData = $this->vexpensesService->getReports($filters, $includes);
-
         $reports = [];
         if ($reportsData && isset($reportsData["data"])) {
             $reports = $reportsData["data"];
@@ -71,18 +72,17 @@ class ReportController extends Controller
     {
         try {
             $settings = IntegrationSetting::all()->keyBy("key");
-
             $statusStringToImport = $settings["VEXPENSES_REPORT_STATUS_TO_IMPORT"]->value ?? "APROVADO";
             $includesValue = $settings["VEXPENSES_API_INCLUDES"]->value ?? "users,expenses";
             $includes = !empty($includesValue) ? explode(",", $includesValue) : ["users", "expenses"];
-            
+
             if (!in_array("expenses", $includes)) {
                 $includes[] = "expenses";
             }
             if (!in_array("users", $includes)) {
                 $includes[] = "users";
             }
-            
+
             $filters = ["status_string" => $statusStringToImport];
 
             $periodType = $settings["VEXPENSES_IMPORT_PERIOD_TYPE"]->value ?? "all_time";
@@ -123,7 +123,7 @@ class ReportController extends Controller
             if ($calculatedStartDate && $calculatedEndDate) {
                 $filters["search"] = "approval_date:{$calculatedStartDate},{$calculatedEndDate}";
                 $filters["searchFields"] = "approval_date:between";
-            } elseif ($calculatedStartDate) { 
+            } elseif ($calculatedStartDate) {
                 $filters["search"] = "approval_date:{$calculatedStartDate}";
                 $filters["searchFields"] = "approval_date:>=";
             }
@@ -154,11 +154,12 @@ class ReportController extends Controller
                 $reportIdFromApi = $vexpensesReport["id"];
 
                 $existingReport = FinancialReport::where("vexpenses_report_id", $reportIdFromApi)->first();
+
                 $localUser = null;
                 $vexpensesUserIntegrationIdFromApi = null;
                 $reportNeedsSave = false;
-                $calculatedAmount = 0;
 
+                $calculatedAmount = 0;
                 $expensesField = $vexpensesReport["expenses"] ?? null;
                 if ($expensesField) {
                     $expensesDataField = $expensesField->data ?? ($expensesField["data"] ?? null);
@@ -171,7 +172,7 @@ class ReportController extends Controller
                         }
                     }
                 }
-                
+
                 $userField = $vexpensesReport["user"] ?? null;
                 if ($userField) {
                     $userDataField = $userField->data ?? ($userField["data"] ?? null);
@@ -191,18 +192,42 @@ class ReportController extends Controller
                         $existingReport->vexpenses_user_integration_id = $vexpensesUserIntegrationIdFromApi;
                         $reportNeedsSave = true;
                     }
+
                     $idToSearchUser = $existingReport->vexpenses_user_integration_id ?? $vexpensesUserIntegrationIdFromApi;
                     if ($idToSearchUser) {
                         $localUser = User::where("vexpenses_id", $idToSearchUser)->first();
                     }
+
                     if (is_null($existingReport->user_id) && $localUser) {
                         $existingReport->user_id = $localUser->id;
                         $reportNeedsSave = true;
-                    }                    
+                    }
+
                     if ($existingReport->amount != $calculatedAmount) {
                         $existingReport->amount = $calculatedAmount;
                         $reportNeedsSave = true;
                     }
+                    
+                    // Atualizar outros campos se necessário, como description, report_date, status da API
+                    $apiStatus = $vexpensesReport["status_string"] ?? "Pendente";
+                    $localStatus = $existingReport->status;
+                    // Só atualiza o status local se não estiver "Pago" localmente, 
+                    // para não sobrescrever um pagamento manual com um status da API.
+                    if ($localStatus !== "Pago" && $apiStatus !== $localStatus) {
+                        // Mapear status da API para status locais se necessário, ou usar diretamente
+                        // Por enquanto, vamos assumir que o status da API pode ser usado se não for "Pago" localmente.
+                        // Se o status da API for "PAGO", e localmente não, atualizamos para "Importado" e o usuário paga manualmente.
+                        // Ou, se a regra for que "PAGO" na API deve refletir como "Pago" localmente, ajuste aqui.
+                        // Para este exemplo, vamos manter o status local se já for "Pago", senão, usamos o da API (ou um mapeamento)
+                        // Se o status da API for PAGO, e o local não, talvez o ideal seja apenas registrar, mas não mudar para PAGO automaticamente aqui.
+                        // A ação de Pagar no ERP que deve fazer isso.
+                        // Vamos apenas garantir que o status local reflita um estado "Importado" ou "Pendente" se não for "Pago".
+                        if ($apiStatus === "APROVADO" && $localStatus !== "Pago") {
+                            $existingReport->status = "Importado"; // Ou "Pendente"
+                            $reportNeedsSave = true;
+                        }
+                    }
+
                     if ($reportNeedsSave) {
                         $updatedCount++;
                         $existingReport->save();
@@ -213,105 +238,118 @@ class ReportController extends Controller
                     if ($vexpensesUserIntegrationIdFromApi) {
                         $localUser = User::where("vexpenses_id", $vexpensesUserIntegrationIdFromApi)->first();
                     }
-                    $newReport = FinancialReport::create([
-                        "user_id" => $localUser ? $localUser->id : null,
+
+                    $reportToProcess = FinancialReport::create([
                         "vexpenses_report_id" => $reportIdFromApi,
-                        "vexpenses_user_integration_id" => $vexpensesUserIntegrationIdFromApi, 
-                        "description" => $vexpensesReport["description"] ?? "N/A",
+                        "description" => $vexpensesReport["name"] ?? "Relatório VExpenses #{$reportIdFromApi}",
                         "amount" => $calculatedAmount,
-                        "report_date" => Carbon::parse($vexpensesReport["report_date"] ?? $vexpensesReport["approval_date"] ?? now())->toDateString(),
-                        "status" => "Importado",
+                        "report_date" => isset($vexpensesReport["approval_date"]) ? Carbon::parse($vexpensesReport["approval_date"]) : Carbon::parse($vexpensesReport["created_at"]),
+                        "status" => "Importado", // Status inicial para novos relatórios importados
                         "origin" => "VExpenses",
-                        "notes" => $vexpensesReport["observation"] ?? null,
+                        "user_id" => $localUser ? $localUser->id : null,
+                        "vexpenses_user_integration_id" => $vexpensesUserIntegrationIdFromApi,
+                        // Adicione outros campos conforme necessário
                     ]);
-                    $reportToProcess = $newReport;
                     $importedCount++;
                 }
 
-                if ($reportToProcess && $expensesDataField && is_array($expensesDataField)) {
-                    $currentFinancialReportId = $reportToProcess->id;
+                // Salvar/Atualizar Despesas
+                if ($reportToProcess && $expensesField && isset($expensesDataField) && is_array($expensesDataField)) {
                     foreach ($expensesDataField as $expenseItem) {
                         $expense = (array) $expenseItem;
-                        $vexpensesExpenseId = $expense["id"] ?? null;
+                        $expenseIdFromApi = $expense["id"];
 
-                        if ($vexpensesExpenseId) {
-                            FinancialReportExpense::updateOrCreate(
-                                [
-                                    "financial_report_id" => $currentFinancialReportId,
-                                    "vexpenses_expense_id" => $vexpensesExpenseId
-                                ],
-                                [
-                                    "title" => $expense["title"] ?? "N/A",
-                                    "date" => Carbon::parse($expense["date"])->toDateString(),
-                                    "value" => (float)($expense["value"] ?? 0),
-                                    "receipt_url" => $expense["reicept_url"] ?? ($expense["receipt_url"] ?? null),
-                                    "observation" => $expense["observation"] ?? null
-                                ]
-                            );
-                            $newExpensesSavedCount++;
-                        }
+                        FinancialReportExpense::updateOrCreate(
+                            [
+                                "financial_report_id" => $reportToProcess->id,
+                                "vexpenses_expense_id" => $expenseIdFromApi
+                            ],
+                            [
+                                "title" => $expense["name"] ?? "Despesa",
+                                "expense_date" => Carbon::parse($expense["date"] ?? $reportToProcess->report_date),
+                                "value" => (float)($expense["value"] ?? 0),
+                                "observation" => $expense["observation"] ?? null,
+                                "receipt_url" => $expense["receipt_url"] ?? null,
+                                // Adicione outros campos da despesa conforme necessário
+                            ]
+                        );
+                        $newExpensesSavedCount++; // Conta cada updateOrCreate como uma operação de despesa salva/atualizada
                     }
                 }
             }
 
-            $message = [];
-            if ($importedCount > 0) $message[] = "{$importedCount} relatório(s) novo(s) importado(s).";
-            if ($updatedCount > 0) $message[] = "{$updatedCount} relatório(s) existente(s) foram atualizado(s).";
-            if ($newExpensesSavedCount > 0) $message[] = "{$newExpensesSavedCount} despesa(s) individual(is) foram salvas/atualizadas.";
-            if ($skippedCount > 0 && $updatedCount == 0 && $importedCount == 0) $message[] = "{$skippedCount} relatório(s) já existiam e não precisaram de atualização.";
-            if (empty($message)) $message[] = "Nenhuma operação de importação ou atualização realizada (verifique os filtros e o período selecionado).";
-            
-            return redirect()->route("financial_reports.index")->with("success", implode(" ", $message));
+            $message = "Importação concluída. {$importedCount} novos relatórios importados, {$updatedCount} atualizados, {$skippedCount} já existentes e sem alterações. {$newExpensesSavedCount} despesas processadas.";
+            return redirect()->route("financial_reports.index")->with("success", $message);
 
         } catch (\Exception $e) {
-            Log::error("Erro ao importar relatórios do VExpenses: " . $e->getMessage(), ["exception" => $e, "trace" => $e->getTraceAsString()]);
-            return redirect()->route("financial_reports.index")->with("error", "Ocorreu um erro ao importar os relatórios: " . $e->getMessage());
+            Log::error("Erro durante a importação de relatórios do VExpenses", [
+                "error" => $e->getMessage(),
+                "trace" => $e->getTraceAsString()
+            ]);
+            return redirect()->route("financial_reports.index")->with("error", "Ocorreu um erro durante a importação: " . $e->getMessage());
         }
     }
 
-    public function markAsPaid(Request $request, $localReportId)
+    public function markAsPaid(Request $request, FinancialReport $financialReport)
     {
-        $localReport = FinancialReport::find($localReportId);
-        if (!$localReport) {
-            return redirect()->back()->with("error", "Relatório local não encontrado.");
-        }
-
         try {
-            $paymentDate = Carbon::now(); // Get current date and time
+            $paymentDate = Carbon::now(); // Data de pagamento atual
 
-            if ($localReport->origin === "VExpenses" && $localReport->vexpenses_report_id) {
-                $dataForVExpenses = [
-                    'payment_date' => $paymentDate->format('Y-m-d H:i:s'), // Format as YYYY-MM-DD HH:MM:SS
+            // Regra de negócio: Se o relatório veio do VExpenses, tenta marcar como pago na API também
+            if ($financialReport->origin === "VExpenses" && $financialReport->vexpenses_report_id) {
+                $vexpensesApiData = [
+                    "payment_date" => $paymentDate->toDateTimeString(), // Formato esperado pela API: YYYY-MM-DD HH:MM:SS
                 ];
-                $updateResult = $this->vexpensesService->markReportAsPaid($localReport->vexpenses_report_id, $dataForVExpenses);
+                
+                Log::info("Tentando marcar relatório VExpenses como pago na API", [
+                    "local_report_id" => $financialReport->id,
+                    "vexpenses_report_id" => $financialReport->vexpenses_report_id,
+                    "data_sent" => $vexpensesApiData
+                ]);
 
-                if ($updateResult === null || (is_array($updateResult) && isset($updateResult['success']) && !$updateResult['success'])) {
-                    $errorMessage = "Falha ao marcar o relatório como pago no VExpenses.";
-                    $logContext = ["vexpenses_report_id" => $localReport->vexpenses_report_id];
-                    if(is_array($updateResult) && isset($updateResult['message'])) {
-                        $errorMessage .= " Detalhe: " . $updateResult['message'];
-                        $logContext['service_message'] = $updateResult['message'];
+                $apiResponse = $this->vexpensesService->markReportAsPaid($financialReport->vexpenses_report_id, $vexpensesApiData);
+
+                // Verifica se a resposta da API foi bem-sucedida
+                if (!$apiResponse || (isset($apiResponse["success"]) && !$apiResponse["success"])) {
+                    $errorMessage = "Falha ao marcar relatório como pago na API VExpenses.";
+                    if (isset($apiResponse["message"])) {
+                        $errorMessage .= " Detalhe: " . $apiResponse["message"];
                     }
-                    if(is_array($updateResult) && isset($updateResult['response_body'])) {
-                        $logContext['service_response_body'] = $updateResult['response_body'];
+                    if (isset($apiResponse["errors"])) {
+                        $errorMessage .= " Erros: " . json_encode($apiResponse["errors"]);
                     }
-                    Log::error("Falha ao marcar relatório como Pago na API VExpenses via Service.", $logContext);
-                    return redirect()->back()->with("error", $errorMessage);
+                    Log::error($errorMessage, [
+                        "local_report_id" => $financialReport->id,
+                        "vexpenses_report_id" => $financialReport->vexpenses_report_id,
+                        "api_response" => $apiResponse
+                    ]);
+                    // Decisão: Se falhar na API, não marcar localmente e retornar erro?
+                    // Ou marcar localmente e apenas avisar sobre a falha na API?
+                    // Por segurança, se a API VExpenses é a fonte da verdade para pagamentos VExpenses,
+                    // talvez seja melhor não marcar localmente se a API falhar.
+                    return redirect()->route("financial_reports.index")->with("error", $errorMessage . " O status local não foi alterado.");
                 }
             }
 
-            // Save local status and payment date
-            $localReport->status = "Pago";
-            $localReport->payment_date = $paymentDate; // Store the Carbon object, DB will handle format
-            $localReport->save();
+            // Atualiza o status localmente para "Pago" e registra a data de pagamento
+            $financialReport->status = "Pago";
+            $financialReport->payment_date = $paymentDate;
+            $financialReport->save();
 
-            return redirect()->route("financial_reports.index")->with("success", "Relatório marcado como pago com sucesso!");
+            Log::info("Relatório marcado como pago localmente", [
+                "local_report_id" => $financialReport->id,
+                "origin" => $financialReport->origin
+            ]);
+
+            return redirect()->route("financial_reports.index")->with("success", "Relatório #{$financialReport->id} marcado como pago com sucesso!");
 
         } catch (\Exception $e) {
-            Log::error("Erro ao marcar relatório como pago: " . $e->getMessage(), [
-                "report_id" => $localReport->id,
+            Log::error("Erro ao marcar relatório como pago", [
+                "report_id" => $financialReport->id ?? null,
+                "error" => $e->getMessage(),
+                "trace" => $e->getTraceAsString()
             ]);
-            return redirect()->back()->with("error", "Ocorreu um erro ao marcar o relatório como pago: " . $e->getMessage());
+            return redirect()->route("financial_reports.index")->with("error", "Ocorreu um erro ao tentar marcar o relatório como pago. Detalhes: " . $e->getMessage());
         }
     }
 }

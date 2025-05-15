@@ -14,19 +14,19 @@
     </div>
 
     @if(session("success"))
-        <div class="alert alert-success">
-            {{ session("success") }}
-        </div>
+    <div class="alert alert-success">
+        {{ session("success") }}
+    </div>
     @endif
     @if(session("warning"))
-        <div class="alert alert-warning">
-            {{ session("warning") }}
-        </div>
+    <div class="alert alert-warning">
+        {{ session("warning") }}
+    </div>
     @endif
     @if(session("error"))
-        <div class="alert alert-danger">
-            {{ session("error") }}
-        </div>
+    <div class="alert alert-danger">
+        {{ session("error") }}
+    </div>
     @endif
 
     <form method="GET" action="{{ route("financial_reports.index") }}" class="mb-3">
@@ -36,7 +36,7 @@
                 <select name="status" id="status" class="form-select form-control form-control-sm">
                     <option value="">Todos</option>
                     @foreach($statusOptions as $key => $value)
-                        <option value="{{ $key }}" {{ request("status") == $key ? "selected" : "" }}>{{ $value }}</option>
+                    <option value="{{ $key }}" {{ request("status") == $key ? "selected" : "" }}>{{ $value }}</option>
                     @endforeach
                 </select>
             </div>
@@ -45,7 +45,7 @@
                 <select name="origin" id="origin" class="form-select form-control form-control-sm">
                     <option value="">Todas</option>
                     @foreach($originOptions as $key => $value)
-                        <option value="{{ $key }}" {{ request("origin") == $key ? "selected" : "" }}>{{ $value }}</option>
+                    <option value="{{ $key }}" {{ request("origin") == $key ? "selected" : "" }}>{{ $value }}</option>
                     @endforeach
                 </select>
             </div>
@@ -84,135 +84,138 @@
                 </thead>
                 <tbody style="font-size: 0.9em;"> {{-- Slightly smaller font for body --}}
                     @forelse ($financialReports as $report)
-                        <tr>
-                            <td>{{ $report->id }}</td>
-                            <td>{{ $report->vexpenses_report_id ?? "-" }}</td>
-                            <td>{{ Str::limit($report->description, 35) }}</td> {{-- Limiting description more --}}
-                            <td>{{ Str::limit($report->user->name ?? ($report->vexpenses_user_integration_id ?? "-"), 15) }}</td>
-                            <td class="text-end">R$ {{ number_format($report->amount, 2, ",", ".") }}</td>
-                            <td>{{ \Carbon\Carbon::parse($report->report_date)->format("d/m/y") }}</td> {{-- Shorter date --}}
-                            <td>
-                                <span class="badge bg-{{ $report->status == "Pago" ? "success" : ($report->status == "Pendente" || $report->status == "Importado" ? "warning" : "secondary") }}">
-                                    {{ $report->status }}
-                                </span>
-                            </td>
-                            <td>{{ $report->origin }}</td>
-                            <td>{{ $report->payment_date ? \Carbon\Carbon::parse($report->payment_date)->format("d/m/y") : "-" }}</td>
-                            <td style="text-align: center;">
-                                <button type="button" class="btn btn-xs btn-outline-primary view-expenses-btn mb-1" data-report-id="{{ $report->id }}" title="Ver Despesas">
-                                    <i class="fas fa-eye"></i> <span class="d-none d-md-inline">Despesas</span>
+                    <tr>
+                        <td>{{ $report->id }}</td>
+                        <td>{{ $report->vexpenses_report_id ?? "-" }}</td>
+                        <td>{{ Str::limit($report->description, 35) }}</td> {{-- Limiting description more --}}
+                        <td>{{ Str::limit($report->user->name ?? ($report->vexpenses_user_integration_id ?? "-"), 15) }}</td>
+                        <td class="text-end">R$ {{ number_format($report->amount, 2, ",", ".") }}</td>
+                        <td>{{ \Carbon\Carbon::parse($report->report_date)->format("d/m/y") }}</td> {{-- Shorter date --}}
+                        <td>
+                            <span class="badge bg-{{ $report->status == "Pago" ? "success" : ($report->status == "Pendente" || $report->status == "Importado" ? "warning" : "secondary") }}">
+                                {{ $report->status }}
+                            </span>
+                        </td>
+                        <td>{{ $report->origin }}</td>
+                        <td>{{ $report->payment_date ? \Carbon\Carbon::parse($report->payment_date)->format("d/m/y") : "-" }}</td>
+                        <td style="text-align: center;">
+                            <button type="button" class="btn btn-xs btn-outline-primary view-expenses-btn mb-1" data-report-id="{{ $report->id }}" title="Ver Despesas">
+                                <i class="fas fa-eye"></i> <span class="d-none d-md-inline">Despesas</span>
+                            </button>
+                            @if($report->status !== "Pago")
+                            <form action="{{ route("financial_reports.markAsPaid", $report->id) }}" method="POST" class="d-inline action-btn" onsubmit="return confirm(" Tem certeza que deseja marcar este relatório como pago?");">
+                                @csrf
+                                <button type="submit" class="btn btn-xs btn-success mb-1" title="Marcar como Pago">
+                                    <i class="fas fa-check"></i> <span class="d-none d-md-inline">Pagar</span>
                                 </button>
-                                @if($report->status !== "Pago")
-                                    <a href="{{ route("financial_reports.markAsPaid", $report->id) }}" class="btn btn-xs btn-success mb-1 action-btn" title="Marcar como Pago">
-                                        <i class="fas fa-check"></i> <span class="d-none d-md-inline">Pagar</span>
-                                    </a>
-                                @endif
-                            </td>
-                        </tr>
+                            </form>
+                            @endif
+                        </td>
+                    </tr>
                     @empty
-                        <tr>
-                            <td colspan="10" class="text-center">Nenhum relatório financeiro encontrado.</td>
-                        </tr>
+                    <tr>
+                        <td colspan="10" class="text-center">Nenhum relatório financeiro encontrado.</td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         @if($financialReports->hasPages())
-            <div class="card-footer py-2">
-                {{-- Alterado para usar o template de paginação customizado --}}
-                {{ $financialReports->links("vendor.pagination.custom-pagination") }}
-            </div>
+        <div class="card-footer py-2">
+            {{-- Alterado para usar o template de paginação customizado --}}
+            {{ $financialReports->links("vendor.pagination.custom-pagination") }}
+        </div>
         @endif
     </div>
 </div>
 
 <!-- Modal Detalhes das Despesas -->
 <div class="modal fade" id="expenseDetailsModal" tabindex="-1" aria-labelledby="expenseDetailsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="expenseDetailsModalLabel">Detalhes das Despesas do Relatório #<span id="modalReportId"></span></h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div id="loadingExpenses" class="text-center" style="display: none;">
-          <div class="spinner-border" role="status">
-            <span class="visually-hidden">Carregando...</span>
-          </div>
-          <p>Carregando despesas...</p>
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="expenseDetailsModalLabel">Detalhes das Despesas do Relatório #<span id="modalReportId"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="loadingExpenses" class="text-center" style="display: none;">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Carregando despesas...</p>
+                </div>
+                <div id="noExpensesFound" class="text-center" style="display: none;">
+                    <p>Nenhuma despesa encontrada para este relatório.</p>
+                </div>
+                <table class="table table-sm table-striped" id="expenseDetailsTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Data</th>
+                            <th class="text-end">Valor</th>
+                            <th>Observação</th>
+                            <th>Recibo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseDetailsTableBody">
+                        <!-- As linhas das despesas serão inseridas aqui pelo JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
         </div>
-        <div id="noExpensesFound" class="text-center" style="display: none;">
-          <p>Nenhuma despesa encontrada para este relatório.</p>
-        </div>
-        <table class="table table-sm table-striped" id="expenseDetailsTable" style="display: none;">
-          <thead>
-            <tr>
-              <th>Título</th>
-              <th>Data</th>
-              <th class="text-end">Valor</th>
-              <th>Observação</th>
-              <th>Recibo</th>
-            </tr>
-          </thead>
-          <tbody id="expenseDetailsTableBody">
-            <!-- As linhas das despesas serão inseridas aqui pelo JavaScript -->
-          </tbody>
-        </table>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-      </div>
     </div>
-  </div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const expenseDetailsModalElement = document.getElementById("expenseDetailsModal");
-    if (!expenseDetailsModalElement) {
-        console.error("Elemento do modal #expenseDetailsModal não encontrado.");
-        return;
-    }
+    document.addEventListener("DOMContentLoaded", function() {
+        const expenseDetailsModalElement = document.getElementById("expenseDetailsModal");
+        if (!expenseDetailsModalElement) {
+            console.error("Elemento do modal #expenseDetailsModal não encontrado.");
+            return;
+        }
 
-    const modalReportIdSpan = document.getElementById("modalReportId");
-    const tableBody = document.getElementById("expenseDetailsTableBody");
-    const expenseDetailsTable = document.getElementById("expenseDetailsTable");
-    const loadingDiv = document.getElementById("loadingExpenses");
-    const noExpensesDiv = document.getElementById("noExpensesFound");
+        const modalReportIdSpan = document.getElementById("modalReportId");
+        const tableBody = document.getElementById("expenseDetailsTableBody");
+        const expenseDetailsTable = document.getElementById("expenseDetailsTable");
+        const loadingDiv = document.getElementById("loadingExpenses");
+        const noExpensesDiv = document.getElementById("noExpensesFound");
 
-    document.querySelectorAll(".view-expenses-btn").forEach(button => {
-        button.addEventListener("click", function() {
-            const reportId = this.dataset.reportId;
-            if (modalReportIdSpan) modalReportIdSpan.textContent = reportId;
-            if (tableBody) tableBody.innerHTML = ""; 
-            
-            if (loadingDiv) loadingDiv.style.display = "block";
-            if (noExpensesDiv) noExpensesDiv.style.display = "none";
-            if (expenseDetailsTable) expenseDetailsTable.style.display = "none";
-            
-            if (typeof $ !== "undefined") {
-                $("#expenseDetailsModal").modal("show");
-            } else {
-                console.warn("jQuery não definido. Abertura do modal Bootstrap 4 pode não funcionar via JS puro sem atributos data-toggle/target.");
-            }
+        document.querySelectorAll(".view-expenses-btn").forEach(button => {
+            button.addEventListener("click", function() {
+                const reportId = this.dataset.reportId;
+                if (modalReportIdSpan) modalReportIdSpan.textContent = reportId;
+                if (tableBody) tableBody.innerHTML = "";
 
-            fetch(`/financial-reports/${reportId}/expenses`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Falha ao buscar despesas (Status: ${response.status})`);
-                    }
-                    return response.json();
-                })
-                .then(expenses => {
-                    if (loadingDiv) loadingDiv.style.display = "none";
-                    if (expenses && expenses.length > 0) {
-                        if (expenseDetailsTable) expenseDetailsTable.style.display = "table";
-                        if (tableBody) {
-                            expenses.forEach(expense => {
-                                let receiptLink = expense.receipt_url ? `<a href="${expense.receipt_url}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>` : "-";
-                                tableBody.innerHTML += `
+                if (loadingDiv) loadingDiv.style.display = "block";
+                if (noExpensesDiv) noExpensesDiv.style.display = "none";
+                if (expenseDetailsTable) expenseDetailsTable.style.display = "none";
+
+                if (typeof $ !== "undefined") {
+                    $("#expenseDetailsModal").modal("show");
+                } else {
+                    console.warn("jQuery não definido. Abertura do modal Bootstrap 4 pode não funcionar via JS puro sem atributos data-toggle/target.");
+                }
+
+                fetch(`/financial-reports/${reportId}/expenses`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Falha ao buscar despesas (Status: ${response.status})`);
+                        }
+                        return response.json();
+                    })
+                    .then(expenses => {
+                        if (loadingDiv) loadingDiv.style.display = "none";
+                        if (expenses && expenses.length > 0) {
+                            if (expenseDetailsTable) expenseDetailsTable.style.display = "table";
+                            if (tableBody) {
+                                expenses.forEach(expense => {
+                                    let receiptLink = expense.receipt_url ? `<a href="${expense.receipt_url}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>` : "-";
+                                    tableBody.innerHTML += `
                                     <tr>
                                         <td>${expense.title ? expense.title : "-"}</td>
                                         <td>${expense.date}</td>
@@ -221,26 +224,23 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <td>${receiptLink}</td>
                                     </tr>
                                 `;
-                            });
+                                });
+                            }
+                        } else {
+                            if (noExpensesDiv) noExpensesDiv.style.display = "block";
                         }
-                    } else {
-                        if (noExpensesDiv) noExpensesDiv.style.display = "block";
-                    }
-                })
-                .catch(error => {
-                    if (loadingDiv) loadingDiv.style.display = "none";
-                    if (noExpensesDiv) {
-                        noExpensesDiv.style.display = "block";
-                        noExpensesDiv.innerHTML = `<p class="text-danger">Erro ao carregar despesas: ${error.message}</p>`;
-                    }
-                    console.error("Erro ao buscar despesas:", error);
-                });
+                    })
+                    .catch(error => {
+                        if (loadingDiv) loadingDiv.style.display = "none";
+                        if (noExpensesDiv) {
+                            noExpensesDiv.style.display = "block";
+                            noExpensesDiv.innerHTML = `<p class="text-danger">Erro ao carregar despesas: ${error.message}</p>`;
+                        }
+                        console.error("Erro ao buscar despesas:", error);
+                    });
+            });
         });
     });
-});
 </script>
 
 @endsection
-
-
-
