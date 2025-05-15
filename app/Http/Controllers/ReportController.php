@@ -166,8 +166,7 @@ class ReportController extends Controller
                     continue;
                 }
 
-                // **AJUSTE: Usar 'approval_date' e verificar sua existência**
-                $reportDateFromApi = $vexpensesReport["approval_date"] ?? ($vexpensesReport["created_at"] ?? null); // Fallback para created_at se approval_date não existir
+                $reportDateFromApi = $vexpensesReport["approval_date"] ?? ($vexpensesReport["created_at"] ?? null);
                 if (empty($reportDateFromApi)) {
                     Log::warning("Relatório da API VExpenses ID {$reportIdFromApi} sem 'approval_date' ou 'created_at'. Pulando.", ["report_data" => $vexpensesReportData]);
                     $skippedForMissingDataCount++;
@@ -214,8 +213,8 @@ class ReportController extends Controller
                     "vexpenses_report_id" => $reportIdFromApi,
                     "description" => $vexpensesReport["description"] ?? "Sem descrição",
                     "amount" => $calculatedAmount,
-                    "report_date" => Carbon::parse($reportDateFromApi)->toDateString(), // Usando a data corrigida
-                    "status" => $vexpensesReport["status"] ?? "Importado", // Usando 'status' conforme JSON de exemplo
+                    "report_date" => Carbon::parse($reportDateFromApi)->toDateString(),
+                    "status" => $vexpensesReport["status"] ?? "Importado",
                     "origin" => "VExpenses",
                     "user_id" => $localUser ? $localUser->id : null,
                     "vexpenses_user_integration_id" => $vexpensesUserIntegrationIdFromApi,
@@ -226,11 +225,10 @@ class ReportController extends Controller
                 if ($expensesDataField && is_array($expensesDataField)) {
                     foreach ($expensesDataField as $expenseItem) {
                         $expense = (array) $expenseItem;
-                        // **AJUSTE: Usar 'date' para despesas e verificar existência**
                         $expenseDateFromApi = $expense["date"] ?? ($expense["created_at"] ?? null);
                         if (empty($expenseDateFromApi)) {
                              Log::warning("Despesa do relatório VExpenses ID {$reportIdFromApi} sem 'date' ou 'created_at'. Usando data atual.", ["expense_data" => $expense]);
-                             $expenseDateFromApi = Carbon::now()->toDateTimeString(); // Default para data atual se não existir
+                             $expenseDateFromApi = Carbon::now()->toDateTimeString();
                         }
 
                         FinancialReportExpense::create([
@@ -238,22 +236,20 @@ class ReportController extends Controller
                             "vexpenses_expense_id" => $expense["id"] ?? null,
                             "title" => $expense["title"] ?? "Despesa sem título",
                             "value" => (float)($expense["value"] ?? 0),
-                            "expense_date" => Carbon::parse($expenseDateFromApi)->toDateString(),
+                            "date" => Carbon::parse($expenseDateFromApi)->toDateString(), // Corrected from expense_date
                             "observation" => $expense["observation"] ?? null,
-                            "receipt_url" => $expense["reicept_url"] ?? ($expense["receipt_url"] ?? null), // Corrigido typo 'reicept_url'
+                            "receipt_url" => $expense["reicept_url"] ?? ($expense["receipt_url"] ?? null),
                         ]);
                         $newExpensesSavedCount++;
                     }
                 }
             }
             
-            // **AJUSTE: Mensagem de sucesso resumida para fetchNew**
             $successMessage = "Busca de Novos Relatórios Concluída. Novos relatórios importados: {$newlyImportedCount}.";
             if ($alreadyExistedCount > 0) {
                 $successMessage .= " Relatórios já existentes e ignorados: {$alreadyExistedCount}.";
             }
             if ($skippedForMissingDataCount > 0) {
-                // Log interno é suficiente, não precisa mostrar ao usuário por padrão para esta ação
                 Log::info("Relatórios da API pulados por falta de dados essenciais durante fetchNew: {$skippedForMissingDataCount}");
             }
 
@@ -361,14 +357,13 @@ class ReportController extends Controller
 
                 $updateData = [
                     "description" => $vexpensesReport["description"] ?? $existingReport->description,
-                    "amount" => $calculatedAmount, // Sempre recalcular o valor total
+                    "amount" => $calculatedAmount, 
                     "report_date" => $reportDateFromApi,
-                    "status" => $vexpensesReport["status"] ?? $existingReport->status, // Atualiza status se presente na API
+                    "status" => $vexpensesReport["status"] ?? $existingReport->status,
                     "user_id" => $localUser ? $localUser->id : $existingReport->user_id,
                     "vexpenses_user_integration_id" => $vexpensesUserIntegrationIdFromApi,
                 ];
 
-                // Verificar se houve alguma alteração real nos dados antes de salvar
                 $changed = false;
                 foreach ($updateData as $key => $value) {
                     if ($existingReport->{$key} != $value) {
@@ -385,13 +380,12 @@ class ReportController extends Controller
                     $noChangesCount++;
                 }
 
-                // Sincronizar despesas individuais (adicionar/atualizar)
                 if ($expensesDataField && is_array($expensesDataField)) {
                     $apiExpenseIds = array_map(function($item) { 
                         $itemArray = (array)$item;
                         return $itemArray["id"] ?? null; 
                     }, $expensesDataField);
-                    $apiExpenseIds = array_filter($apiExpenseIds); // Remover nulos
+                    $apiExpenseIds = array_filter($apiExpenseIds);
 
                     $localExpensesCollection = FinancialReportExpense::where("financial_report_id", $existingReport->id)->get();
                     $localExpensesKeyedById = [];
@@ -402,11 +396,11 @@ class ReportController extends Controller
                     foreach ($expensesDataField as $expenseItem) {
                         $expense = (array) $expenseItem;
                         $apiExpenseId = $expense["id"] ?? null;
-                        if (!$apiExpenseId) continue; // Pula despesa da API sem ID
+                        if (!$apiExpenseId) continue;
 
                         $expenseDateFromApi = $expense["date"] ?? ($expense["created_at"] ?? null);
                         if (empty($expenseDateFromApi)) {
-                             $expenseDateFromApi = $reportDateFromApi; // Usa data do relatório se despesa não tiver data
+                             $expenseDateFromApi = $reportDateFromApi;
                         }
 
                         $expenseDataToSave = [
@@ -414,7 +408,7 @@ class ReportController extends Controller
                             "vexpenses_expense_id" => $apiExpenseId,
                             "title" => $expense["title"] ?? "Despesa sem título",
                             "value" => (float)($expense["value"] ?? 0),
-                            "expense_date" => Carbon::parse($expenseDateFromApi)->toDateString(),
+                            "date" => Carbon::parse($expenseDateFromApi)->toDateString(), // Corrected from expense_date
                             "observation" => $expense["observation"] ?? null,
                             "receipt_url" => $expense["reicept_url"] ?? ($expense["receipt_url"] ?? null),
                         ];
@@ -434,13 +428,12 @@ class ReportController extends Controller
                             }
                         } else {
                             FinancialReportExpense::create($expenseDataToSave);
-                            $updatedExpensesCount++; // Conta como atualizada, pois é uma adição baseada na API
+                            $updatedExpensesCount++;
                         }
                     }
                 }
             }
             
-            // **AJUSTE: Mensagem de sucesso resumida para updateExisting**
             $successMessage = "Atualização de Relatórios Existentes Concluída.";
             if ($updatedCount > 0) $successMessage .= " Relatórios atualizados: {$updatedCount}.";
             if ($updatedExpensesCount > 0) $successMessage .= " Despesas sincronizadas (adicionadas/atualizadas): {$updatedExpensesCount}.";
@@ -448,7 +441,7 @@ class ReportController extends Controller
             if ($notFoundLocallyCount > 0) $successMessage .= " Relatórios da API não encontrados localmente: {$notFoundLocallyCount}.";
             
             if ($skippedForMissingDataCount > 0) {
-                Log::info("Relatórios da API pulados por falta de dados essenciais durante updateExisting: {$skippedForMissingDataCount}", ['details' => $skippedReportsDetails]);
+                Log::info("Relatórios da API pulados por falta de dados essenciais durante updateExisting: {$skippedForMissingDataCount}", ["details" => $skippedReportsDetails]);
             }
 
             return redirect()->route("financial_reports.index")->with("success_detailed", [
@@ -482,7 +475,7 @@ class ReportController extends Controller
                 Log::info("Tentativa de marcar relatório como pago no VExpenses", [
                     "report_id" => $financialReport->id,
                     "vexpenses_report_id" => $financialReport->vexpenses_report_id,
-                    "payload_sent" => $payload, // Log do payload enviado
+                    "payload_sent" => $payload,
                     "simulate_error_setting" => $simulateError,
                     "api_response" => $apiResponse
                 ]);
@@ -523,15 +516,11 @@ class ReportController extends Controller
         }
     }
 
-    // Novo método adicionado
     public function getExpensesData(Request $request, FinancialReport $financialReport)
     {
-        // Removido o log anterior para evitar duplicidade, o novo log abaixo é mais completo para este caso.
-
         try {
             $expenses = FinancialReportExpense::where('financial_report_id', $financialReport->id)->get();
             
-            // Log para ver o array completo de despesas antes de enviar ao frontend
             Log::info('Array de despesas completo para o relatório ID: ' . $financialReport->id, ['expenses_array' => $expenses->toArray()]);
 
             return response()->json([

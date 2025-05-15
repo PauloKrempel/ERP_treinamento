@@ -15,7 +15,7 @@ class IntegrationSettingController extends Controller
     public function index()
     {
         $this->ensureDefaultSettingsExist();
-        $settings = IntegrationSetting::all()->keyBy("key"); // Changed to keyBy for easier access in index view if needed
+        $settings = IntegrationSetting::all()->keyBy("key");
         return view("integration_settings.index", compact("settings"))
             ->with("pageTitle", "Configurações da Integração VExpenses");
     }
@@ -34,7 +34,6 @@ class IntegrationSettingController extends Controller
             "PAGO" => "PAGO",
             "REPROVADO" => "REPROVADO",
         ];
-        // Pass period type options as well, though they are hardcoded in the blade for now
         return view("integration_settings.edit", compact("settings", "statusOptions"))
             ->with("pageTitle", "Editar Configurações da Integração");
     }
@@ -52,15 +51,15 @@ class IntegrationSettingController extends Controller
             "VEXPENSES_IMPORT_PERIOD_TYPE" => ["required", "string", Rule::in(["all_time", "last_24_hours", "last_7_days", "last_15_days", "last_30_days", "custom"])],
             "VEXPENSES_IMPORT_CUSTOM_START_DATE" => "nullable|date|required_if:VEXPENSES_IMPORT_PERIOD_TYPE,custom",
             "VEXPENSES_IMPORT_CUSTOM_END_DATE" => "nullable|date|required_if:VEXPENSES_IMPORT_PERIOD_TYPE,custom|after_or_equal:VEXPENSES_IMPORT_CUSTOM_START_DATE",
+            "VEXPENSES_SIMULATE_PAYMENT_DATE_ERROR" => "required|in:true,false", // Added rule for the new checkbox
         ];
 
         $validatedData = $request->validate($rules);
 
         try {
             foreach ($validatedData as $key => $value) {
-                // Handle cases where custom dates might not be sent if period is not custom
                 if (in_array($key, ["VEXPENSES_IMPORT_CUSTOM_START_DATE", "VEXPENSES_IMPORT_CUSTOM_END_DATE"]) && $validatedData["VEXPENSES_IMPORT_PERIOD_TYPE"] !== "custom") {
-                    $valueToSave = null; // Or empty string, depending on how you want to store it
+                    $valueToSave = null;
                 } else {
                     $valueToSave = $value;
                 }
@@ -69,12 +68,16 @@ class IntegrationSettingController extends Controller
                     ["value" => $valueToSave]
                 );
             }
-            // Ensure custom date fields are explicitly saved as null if not 'custom' type, even if not in $validatedData because they are nullable
+            
             if ($validatedData["VEXPENSES_IMPORT_PERIOD_TYPE"] !== "custom") {
                 IntegrationSetting::updateOrCreate(["key" => "VEXPENSES_IMPORT_CUSTOM_START_DATE"], ["value" => null]);
                 IntegrationSetting::updateOrCreate(["key" => "VEXPENSES_IMPORT_CUSTOM_END_DATE"], ["value" => null]);
             }
 
+            // Explicitly handle VEXPENSES_SIMULATE_PAYMENT_DATE_ERROR as it might not be in $validatedData if unchecked and no hidden input is used correctly
+            // The blade already includes a hidden input with value="false", so $request->VEXPENSES_SIMULATE_PAYMENT_DATE_ERROR will be 'true' or 'false'
+            // The validation rule 'required|in:true,false' ensures it's present and has one of these string values.
+            // So, the loop above already handles it correctly.
 
             return redirect()->route("integration-settings.index")
                 ->with("success", "Configurações da integração atualizadas com sucesso.");
@@ -105,21 +108,27 @@ class IntegrationSettingController extends Controller
             ],
             [
                 "key" => "VEXPENSES_IMPORT_PERIOD_TYPE",
-                "value" => "all_time", // Default to all time
+                "value" => "all_time",
                 "name" => "Período de Importação de Relatórios VExpenses",
                 "description" => "Define o período padrão para buscar relatórios do VExpenses (ex: all_time, last_24_hours, custom)."
             ],
             [
                 "key" => "VEXPENSES_IMPORT_CUSTOM_START_DATE",
-                "value" => null, // Default to null
+                "value" => null,
                 "name" => "Data de Início Personalizada para Importação",
-                "description" => "Se o período de importação for 'custom', esta é a data de início."
+                "description" => "Se o período de importação for \'custom\', esta é a data de início."
             ],
             [
                 "key" => "VEXPENSES_IMPORT_CUSTOM_END_DATE",
-                "value" => null, // Default to null
+                "value" => null,
                 "name" => "Data Final Personalizada para Importação",
-                "description" => "Se o período de importação for 'custom', esta é a data final."
+                "description" => "Se o período de importação for \'custom\', esta é a data final."
+            ],
+            [
+                "key" => "VEXPENSES_SIMULATE_PAYMENT_DATE_ERROR", // Added default for the new setting
+                "value" => "false", // Default to 'false' (string, as values are stored as strings)
+                "name" => "Simular Erro de payment_date na API VExpenses",
+                "description" => "Quando marcado, a aplicação não enviará o campo \'payment_date\' ao marcar um relatório como pago na VExpenses, simulando o erro \'Invalid data\'. Desmarcado, enviará o \'payment_date\' normalmente."
             ],
         ];
 
