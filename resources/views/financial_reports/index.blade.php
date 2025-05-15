@@ -6,27 +6,82 @@
         <h1>{{ $pageTitle ?? "Contas a Pagar (Relatórios Financeiros)" }}</h1>
         <div>
             <a href="{{ route("financial_reports.create") }}" class="btn btn-success btn-sm">Adicionar Relatório Manual</a>
-            <form action="{{ route("vexpenses.reports.import") }}" method="POST" class="d-inline">
+            
+            {{-- Botão para Puxar Novos Relatórios --}}
+            <form action="{{ route("vexpenses.reports.import") }}" method="POST" class="d-inline ms-1">
                 @csrf
-                <button type="submit" class="btn btn-info btn-sm">Puxar Relatórios do VExpenses</button>
+                <button type="submit" class="btn btn-info btn-sm">Puxar Novos Relatórios do VExpenses</button>
+            </form>
+
+            {{-- Novo Botão para Atualizar Relatórios Existentes --}}
+            <form action="{{ route("vexpenses.reports.updateExisting") }}" method="POST" class="d-inline ms-1">
+                @csrf
+                <button type="submit" class="btn btn-warning btn-sm">Atualizar Relatórios Existentes do VExpenses</button>
             </form>
         </div>
     </div>
 
-    @if(session("success"))
-    <div class="alert alert-success">
-        {{ session("success") }}
-    </div>
+    {{-- Exibição de Mensagens Flash Detalhadas --}}
+    @if(session("success_detailed"))
+        <div class="alert alert-success">
+            <strong>{{ session("success_detailed")["title"] }}</strong>
+            @if(isset(session("success_detailed")["details"]) && is_array(session("success_detailed")["details"]))
+                <ul>
+                    @foreach(session("success_detailed")["details"] as $detail)
+                        <li>{{ $detail }}</li>
+                    @endforeach
+                </ul>
+            @elseif(isset(session("success_detailed")["details"]) && is_string(session("success_detailed")["details"]))
+                 <p>{{ session("success_detailed")["details"] }}</p>
+            @endif
+        </div>
     @endif
-    @if(session("warning"))
-    <div class="alert alert-warning">
-        {{ session("warning") }}
-    </div>
+
+    @if(session("error_detailed"))
+        <div class="alert alert-danger">
+            <strong>{{ session("error_detailed")["title"] }}</strong>
+            @if(isset(session("error_detailed")["details"]) && is_array(session("error_detailed")["details"]))
+                <ul>
+                    @foreach(session("error_detailed")["details"] as $detail)
+                        <li>{{ $detail }}</li>
+                    @endforeach
+                </ul>
+            @elseif(isset(session("error_detailed")["details"]) && is_string(session("error_detailed")["details"]))
+                 <p>{{ session("error_detailed")["details"] }}</p>
+            @endif
+        </div>
     @endif
-    @if(session("error"))
-    <div class="alert alert-danger">
-        {{ session("error") }}
-    </div>
+
+    @if(session("warning_detailed"))
+        <div class="alert alert-warning">
+            <strong>{{ session("warning_detailed")["title"] }}</strong>
+            @if(isset(session("warning_detailed")["details"]) && is_array(session("warning_detailed")["details"]))
+                <ul>
+                    @foreach(session("warning_detailed")["details"] as $detail)
+                        <li>{{ $detail }}</li>
+                    @endforeach
+                </ul>
+            @elseif(isset(session("warning_detailed")["details"]) && is_string(session("warning_detailed")["details"]))
+                 <p>{{ session("warning_detailed")["details"] }}</p>
+            @endif
+        </div>
+    @endif
+
+    {{-- Mensagens Flash Simples (mantidas para compatibilidade ou outros usos) --}}
+    @if(session("success") && !session("success_detailed"))
+        <div class="alert alert-success">
+            {{ session("success") }}
+        </div>
+    @endif
+    @if(session("warning") && !session("warning_detailed"))
+        <div class="alert alert-warning">
+            {{ session("warning") }}
+        </div>
+    @endif
+    @if(session("error") && !session("error_detailed"))
+        <div class="alert alert-danger">
+            {{ session("error") }}
+        </div>
     @endif
 
     <form method="GET" action="{{ route("financial_reports.index") }}" class="mb-3">
@@ -36,7 +91,7 @@
                 <select name="status" id="status" class="form-select form-control form-control-sm">
                     <option value="">Todos</option>
                     @foreach($statusOptions as $key => $value)
-                    <option value="{{ $key }}" {{ request("status") == $key ? "selected" : "" }}>{{ $value }}</option>
+                        <option value="{{ $key }}" {{ request("status") == $key ? "selected" : "" }}>{{ $value }}</option>
                     @endforeach
                 </select>
             </div>
@@ -45,7 +100,7 @@
                 <select name="origin" id="origin" class="form-select form-control form-control-sm">
                     <option value="">Todas</option>
                     @foreach($originOptions as $key => $value)
-                    <option value="{{ $key }}" {{ request("origin") == $key ? "selected" : "" }}>{{ $value }}</option>
+                        <option value="{{ $key }}" {{ request("origin") == $key ? "selected" : "" }}>{{ $value }}</option>
                     @endforeach
                 </select>
             </div>
@@ -66,7 +121,6 @@
     <div class="card">
         <div class="card-header py-2">Lista de Relatórios</div> {{-- Reduced padding --}}
         <div class="table-responsive">
-            {{-- Removed min-width to let table try to fit, but responsive will still add scroll if needed --}}
             <table class="table table-striped table-hover table-sm"> {{-- table-sm for smaller padding --}}
                 <thead style="font-size: 0.9em;"> {{-- Slightly smaller font for header --}}
                     <tr>
@@ -84,54 +138,56 @@
                 </thead>
                 <tbody style="font-size: 0.9em;"> {{-- Slightly smaller font for body --}}
                     @forelse ($financialReports as $report)
-                    <tr>
-                        <td>{{ $report->id }}</td>
-                        <td>{{ $report->vexpenses_report_id ?? "-" }}</td>
-                        <td>{{ Str::limit($report->description, 35) }}</td> {{-- Limiting description more --}}
-                        <td>{{ Str::limit($report->user->name ?? ($report->vexpenses_user_integration_id ?? "-"), 15) }}</td>
-                        <td class="text-end">R$ {{ number_format($report->amount, 2, ",", ".") }}</td>
-                        <td>{{ \Carbon\Carbon::parse($report->report_date)->format("d/m/y") }}</td> {{-- Shorter date --}}
-                        <td>
-                            <span class="badge bg-{{ $report->status == "Pago" ? "success" : ($report->status == "Pendente" || $report->status == "Importado" ? "warning" : "secondary") }}">
-                                {{ $report->status }}
-                            </span>
-                        </td>
-                        <td>{{ $report->origin }}</td>
-                        <td>{{ $report->payment_date ? \Carbon\Carbon::parse($report->payment_date)->format("d/m/y") : "-" }}</td>
-                        <td style="text-align: center;">
-                            <button type="button" class="btn btn-xs btn-outline-primary view-expenses-btn mb-1" data-report-id="{{ $report->id }}" title="Ver Despesas">
-                                <i class="fas fa-eye"></i> <span class="d-none d-md-inline">Despesas</span>
-                            </button>
-                            @if($report->status !== "Pago")
-                            <form action="{{ route("financial_reports.markAsPaid", $report->id) }}" method="POST" class="d-inline action-btn" onsubmit="return confirm(" Tem certeza que deseja marcar este relatório como pago?");">
-                                @csrf
-                                <button type="submit" class="btn btn-xs btn-success mb-1" title="Marcar como Pago">
-                                    <i class="fas fa-check"></i> <span class="d-none d-md-inline">Pagar</span>
+                        <tr>
+                            <td>{{ $report->id }}</td>
+                            <td>{{ $report->vexpenses_report_id ?? "-" }}</td>
+                            <td>{{ Str::limit($report->description, 35) }}</td> {{-- Limiting description more --}}
+                            <td>{{ Str::limit($report->user->name ?? ($report->vexpenses_user_integration_id ?? "-"), 15) }}</td>
+                            <td class="text-end">R$ {{ number_format($report->amount, 2, ",", ".") }}</td>
+                            <td>{{ \Carbon\Carbon::parse($report->report_date)->format("d/m/y") }}</td> {{-- Shorter date --}}
+                            <td>
+                                <span class="badge bg-{{ $report->status == "Pago" ? "success" : ($report->status == "Pendente" || $report->status == "Importado" || $report->status == "APROVADO" ? "warning" : "secondary") }}">
+                                    {{ $report->status }}
+                                </span>
+                            </td>
+                            <td>{{ $report->origin }}</td>
+                            <td>{{ $report->payment_date ? \Carbon\Carbon::parse($report->payment_date)->format("d/m/y") : "-" }}</td>
+                            <td style="text-align: center;">
+                                <button type="button" class="btn btn-xs btn-outline-primary view-expenses-btn mb-1 action-btn" 
+                                        data-report-id="{{ $report->id }}" 
+                                        data-report-description="{{ Str::limit($report->description, 50) }}" 
+                                        title="Ver Despesas">
+                                    <i class="fas fa-eye"></i> <span class="d-none d-md-inline">Despesas</span>
                                 </button>
-                            </form>
-                            @endif
-                        </td>
-                    </tr>
+                                @if($report->status !== "Pago")
+                                    <form action="{{ route("financial_reports.markAsPaid", $report->id) }}" method="POST" class="d-inline action-btn" onsubmit="return confirm("Tem certeza que deseja marcar este relatório como pago?");">
+                                        @csrf
+                                        <button type="submit" class="btn btn-xs btn-success mb-1" title="Marcar como Pago">
+                                            <i class="fas fa-check"></i> <span class="d-none d-md-inline">Pagar</span>
+                                        </button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
                     @empty
-                    <tr>
-                        <td colspan="10" class="text-center">Nenhum relatório financeiro encontrado.</td>
-                    </tr>
+                        <tr>
+                            <td colspan="10" class="text-center">Nenhum relatório financeiro encontrado.</td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         @if($financialReports->hasPages())
-        <div class="card-footer py-2">
-            {{-- Alterado para usar o template de paginação customizado --}}
-            {{ $financialReports->links("vendor.pagination.custom-pagination") }}
-        </div>
+            <div class="card-footer py-2">
+                {{ $financialReports->appends(request()->query())->links("vendor.pagination.custom-pagination") }} {{-- Mantendo filtros na paginação --}}
+            </div>
         @endif
     </div>
 </div>
 
-<!-- Modal Detalhes das Despesas -->
-<div class="modal fade" id="expenseDetailsModal" tabindex="-1" aria-labelledby="expenseDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+<!-- Modal Detalhes das Despesas (Bootstrap 4) -->
+<div class="modal fade" id="expenseDetailsModal" tabindex="-1" role="dialog" aria-labelledby="expenseDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="expenseDetailsModalLabel">Detalhes das Despesas do Relatório #<span id="modalReportId"></span></h5>
@@ -140,14 +196,18 @@
                 </button>
             </div>
             <div class="modal-body">
+                <h6 id="modalReportDescription" class="mb-3"></h6>
                 <div id="loadingExpenses" class="text-center" style="display: none;">
                     <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Carregando...</span>
+                        <span class="sr-only">Carregando...</span> {{-- sr-only for Bootstrap 4 --}}
                     </div>
                     <p>Carregando despesas...</p>
                 </div>
                 <div id="noExpensesFound" class="text-center" style="display: none;">
                     <p>Nenhuma despesa encontrada para este relatório.</p>
+                </div>
+                <div id="errorLoadingExpenses" class="text-center text-danger" style="display: none;">
+                    <p>Ocorreu um erro ao carregar as despesas. Tente novamente mais tarde.</p>
                 </div>
                 <table class="table table-sm table-striped" id="expenseDetailsTable" style="display: none;">
                     <thead>
@@ -160,7 +220,7 @@
                         </tr>
                     </thead>
                     <tbody id="expenseDetailsTableBody">
-                        <!-- As linhas das despesas serão inseridas aqui pelo JavaScript -->
+                        <!-- As linhas de despesa serão inseridas aqui pelo JavaScript -->
                     </tbody>
                 </table>
             </div>
@@ -170,77 +230,89 @@
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const expenseDetailsModalElement = document.getElementById("expenseDetailsModal");
-        if (!expenseDetailsModalElement) {
-            console.error("Elemento do modal #expenseDetailsModal não encontrado.");
-            return;
-        }
-
-        const modalReportIdSpan = document.getElementById("modalReportId");
-        const tableBody = document.getElementById("expenseDetailsTableBody");
-        const expenseDetailsTable = document.getElementById("expenseDetailsTable");
-        const loadingDiv = document.getElementById("loadingExpenses");
-        const noExpensesDiv = document.getElementById("noExpensesFound");
-
-        document.querySelectorAll(".view-expenses-btn").forEach(button => {
-            button.addEventListener("click", function() {
-                const reportId = this.dataset.reportId;
-                if (modalReportIdSpan) modalReportIdSpan.textContent = reportId;
-                if (tableBody) tableBody.innerHTML = "";
-
-                if (loadingDiv) loadingDiv.style.display = "block";
-                if (noExpensesDiv) noExpensesDiv.style.display = "none";
-                if (expenseDetailsTable) expenseDetailsTable.style.display = "none";
-
-                if (typeof $ !== "undefined") {
-                    $("#expenseDetailsModal").modal("show");
-                } else {
-                    console.warn("jQuery não definido. Abertura do modal Bootstrap 4 pode não funcionar via JS puro sem atributos data-toggle/target.");
-                }
-
-                fetch(`/financial-reports/${reportId}/expenses`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Falha ao buscar despesas (Status: ${response.status})`);
-                        }
-                        return response.json();
-                    })
-                    .then(expenses => {
-                        if (loadingDiv) loadingDiv.style.display = "none";
-                        if (expenses && expenses.length > 0) {
-                            if (expenseDetailsTable) expenseDetailsTable.style.display = "table";
-                            if (tableBody) {
-                                expenses.forEach(expense => {
-                                    let receiptLink = expense.receipt_url ? `<a href="${expense.receipt_url}" target="_blank" class="btn btn-sm btn-outline-secondary">Ver</a>` : "-";
-                                    tableBody.innerHTML += `
-                                    <tr>
-                                        <td>${expense.title ? expense.title : "-"}</td>
-                                        <td>${expense.date}</td>
-                                        <td class="text-end">R$ ${expense.value}</td>
-                                        <td>${expense.observation ? expense.observation : "-"}</td>
-                                        <td>${receiptLink}</td>
-                                    </tr>
-                                `;
-                                });
-                            }
-                        } else {
-                            if (noExpensesDiv) noExpensesDiv.style.display = "block";
-                        }
-                    })
-                    .catch(error => {
-                        if (loadingDiv) loadingDiv.style.display = "none";
-                        if (noExpensesDiv) {
-                            noExpensesDiv.style.display = "block";
-                            noExpensesDiv.innerHTML = `<p class="text-danger">Erro ao carregar despesas: ${error.message}</p>`;
-                        }
-                        console.error("Erro ao buscar despesas:", error);
-                    });
-            });
-        });
-    });
-</script>
-
 @endsection
+
+@push("styles")
+<style>
+    .action-btn {
+        min-width: 80px; /* Ajuste conforme necessário */
+        margin-bottom: 0.25rem; /* Espaçamento entre botões */
+    }
+    .table-sm th, .table-sm td {
+        padding: 0.4rem; /* Ajuste o padding para células da tabela */
+    }
+</style>
+@endpush
+
+@push("scripts")
+<script>
+$(document).ready(function() { // jQuery document ready
+    // Cache jQuery selectors
+    const $modal = $("#expenseDetailsModal");
+    const $modalReportIdSpan = $("#modalReportId");
+    const $modalReportDescriptionElem = $("#modalReportDescription");
+    const $tableBody = $("#expenseDetailsTableBody");
+    const $expenseTable = $("#expenseDetailsTable");
+    const $loadingDiv = $("#loadingExpenses");
+    const $noExpensesDiv = $("#noExpensesFound");
+    const $errorDiv = $("#errorLoadingExpenses");
+
+    $(".view-expenses-btn").on("click", function() {
+        const reportId = $(this).data("report-id");
+        const reportDescription = $(this).data("report-description");
+        
+        $modalReportIdSpan.text(reportId);
+        $modalReportDescriptionElem.text("Descrição: " + reportDescription);
+        $tableBody.empty(); // Limpa despesas anteriores
+        $expenseTable.hide();
+        $noExpensesDiv.hide();
+        $errorDiv.hide();
+        $loadingDiv.show();
+        
+        $modal.modal("show"); // Show modal using jQuery for Bootstrap 4
+
+        // Fetch expenses data (similar to original, but using the corrected route and expecting JSON object)
+        fetch(`/financial-reports/${reportId}/expenses`) // Route está correta
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => { 
+                        throw new Error(`Network response was not ok (${response.status} ${response.statusText}): ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                $loadingDiv.hide();
+                if (data.expenses && data.expenses.length > 0) {
+                    data.expenses.forEach(expense => {
+                        const expenseDate = new Date(expense.expense_date).toLocaleDateString("pt-BR", { timeZone: "UTC" }); // Ensure date is parsed correctly
+                        const expenseValue = parseFloat(expense.value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                        let receiptLink = "-";
+                        if (expense.receipt_url) {
+                            receiptLink = `<a href="${expense.receipt_url}" target="_blank" class="btn btn-xs btn-outline-info">Ver Recibo</a>`;
+                        }
+
+                        const row = `<tr>
+                                        <td>${expense.title || "-"}</td>
+                                        <td>${expenseDate}</td>
+                                        <td class="text-end">${expenseValue}</td>
+                                        <td>${expense.observation || "-"}</td>
+                                        <td>${receiptLink}</td>
+                                     </tr>`;
+                        $tableBody.append(row);
+                    });
+                    $expenseTable.show();
+                } else {
+                    $noExpensesDiv.show();
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching expenses:", error);
+                $loadingDiv.hide();
+                $errorDiv.text(`Erro ao carregar despesas: ${error.message}`).show();
+            });
+    });
+});
+</script>
+@endpush
+

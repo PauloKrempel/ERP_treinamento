@@ -40,10 +40,14 @@ Route::get('/financial-reports', [FinancialReportController::class, 'index'])->n
 Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markAsPaid'])->name('financial_reports.markAsPaid'); // Re-using markAsPaid from ReportController for now, might move to FinancialReportController
 Route::get('/financial-reports/create', [FinancialReportController::class, 'create'])->name('financial_reports.create');
 Route::post('/financial-reports', [FinancialReportController::class, 'store'])->name('financial_reports.store');
-Route::get('/financial-reports/{financialReport}/expenses', [FinancialReportController::class, 'getExpenses'])->name('financial_reports.expenses'); // Rota para buscar despesas
+Route::get('/financial-reports/{report}/expenses', [ReportController::class, 'getExpensesData'])->name('financial_reports.expenses.data'); // Rota para buscar despesas
 
 // Integration Settings
 Route::resource('integration-settings', IntegrationSettingController::class)->only(['index', 'edit', 'update']);
+
+Route::post('/vexpenses/reports/import', [ReportController::class, 'fetchNewFromVExpenses'])->name('vexpenses.reports.import');
+Route::post('/vexpenses/reports/update-existing', [ReportController::class, 'updateExistingFromVExpenses'])->name('vexpenses.reports.updateExisting');
+
 
 
 // Basic Auth routes (if needed, Laravel Breeze or Jetstream can be installed)
