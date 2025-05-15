@@ -40,7 +40,7 @@ Route::get('/financial-reports', [FinancialReportController::class, 'index'])->n
 Route::post('/financial-reports/{financialReport}/pay', [ReportController::class, 'markAsPaid'])->name('financial_reports.markAsPaid'); // Re-using markAsPaid from ReportController for now, might move to FinancialReportController
 Route::get('/financial-reports/create', [FinancialReportController::class, 'create'])->name('financial_reports.create');
 Route::post('/financial-reports', [FinancialReportController::class, 'store'])->name('financial_reports.store');
-Route::get('/financial-reports/{report}/expenses', [ReportController::class, 'getExpensesData'])->name('financial_reports.expenses.data'); // Rota para buscar despesas
+Route::get('/financial-reports/{financialReport}/expenses', [ReportController::class, 'getExpensesData'])->name('financial_reports.expenses.data');
 
 // Integration Settings
 Route::resource('integration-settings', IntegrationSettingController::class)->only(['index', 'edit', 'update']);

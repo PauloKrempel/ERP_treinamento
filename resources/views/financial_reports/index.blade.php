@@ -283,9 +283,9 @@ $(document).ready(function() { // jQuery document ready
             })
             .then(data => {
                 $loadingDiv.hide();
-                if (data.expenses && data.expenses.length > 0) {
-                    data.expenses.forEach(expense => {
-                        const expenseDate = new Date(expense.expense_date).toLocaleDateString("pt-BR", { timeZone: "UTC" }); // Ensure date is parsed correctly
+                if (data.data && data.data.length > 0) {
+                    data.data.forEach(expense => {
+                        const expenseDate = new Date(expense.date).toLocaleDateString("pt-BR", { timeZone: "UTC" }); 
                         const expenseValue = parseFloat(expense.value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                         let receiptLink = "-";
                         if (expense.receipt_url) {
